@@ -61,6 +61,43 @@ body {
     radial-gradient(circle at 50% 50%, rgba(0, 242, 254, 0.03) 0%, transparent 60%);
 }
 
+/* Drag & Drop Visual Overlay */
+.dropzone-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(7, 9, 14, 0.92);
+  backdrop-filter: blur(16px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-normal);
+}
+
+.dropzone-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dropzone-box {
+  border: 2px dashed var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: var(--border-radius-lg);
+  padding: 50px 70px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+  box-shadow: 0 0 50px var(--primary-glow);
+}
+
 /* Layout App Shell */
 #app-shell {
   display: flex;
@@ -241,22 +278,15 @@ body {
   gap: 28px;
 }
 
-/* Scrollbar Styling */
 .content-area::-webkit-scrollbar {
   width: 6px;
 }
-
 .content-area::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .content-area::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-}
-
-.content-area::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Header Action Bar */
@@ -332,6 +362,37 @@ body {
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(99, 102, 241, 0.5);
+}
+
+/* Filter Tabs */
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--bg-glass-border);
+}
+
+.filter-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.filter-btn:hover {
+  color: #fff;
+}
+
+.filter-btn.active {
+  background: var(--primary);
+  color: #fff;
 }
 
 /* Stat Cards Banner */
@@ -416,6 +477,42 @@ body {
   width: 100%;
   object-fit: cover;
   background: #151c2e;
+}
+
+.card-top-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+
+.card-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(7, 9, 14, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: var(--transition-fast);
+}
+
+.card-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.card-action-btn.favorite.active {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.2);
 }
 
 .game-details {
@@ -561,5 +658,21 @@ body {
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.btn-danger {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: var(--accent-rose);
+  padding: 10px 18px;
+  border-radius: var(--border-radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-danger:hover {
+  background: var(--accent-rose);
   color: #fff;
 }

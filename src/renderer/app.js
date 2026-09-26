@@ -1,4 +1,4 @@
-// OGT Renderer Application Logic
+// OGT Renderer Application Logic - Phase 2 Enhanced
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[OGT Renderer] Initializing application UI shell...');
@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let sessionsState = [];
   let achievementsState = [];
   let activeView = 'dashboard';
+  let libraryFilter = 'all';
 
   // UI DOM Elements
   const navItems = document.querySelectorAll('.nav-item');
@@ -74,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         sessionsState = await window.electronAPI.getSessions();
         achievementsState = await window.electronAPI.getAchievements();
       } else {
-        console.warn('[OGT Renderer] Running in standalone browser preview without IPC bridge');
+        console.warn('[OGT Renderer] Running in standalone browser preview');
       }
       renderAll();
     } catch (err) {
@@ -107,15 +108,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   function createGameCardHTML(game) {
     const hours = ((game.totalPlaytimeMinutes || 0) / 60).toFixed(1);
     const cover = game.coverImage || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
-    
+    const favClass = game.favorite ? 'active' : '';
+
     return `
       <div class="game-card" data-id="${game.id}">
+        <div class="card-top-actions">
+          <button class="card-action-btn favorite ${favClass}" data-id="${game.id}" title="Toggle Favorite">⭐</button>
+          <button class="card-action-btn edit" data-id="${game.id}" title="Edit Game">⚙️</button>
+        </div>
         <img class="game-cover" src="${cover}" alt="${game.title}" loading="lazy">
         <div class="game-details">
           <div class="game-title" title="${game.title}">${game.title}</div>
           <div class="game-meta">
-            <span>${game.genre || 'Game'}</span>
-            <span class="game-playtime">${hours}h played</span>
+            <span>${game.company || game.genre || 'Offline Game'}</span>
+            <span class="game-playtime">${hours}h</span>
           </div>
           <button class="launch-btn" data-id="${game.id}">Launch Game</button>
         </div>
@@ -128,11 +134,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!grid) return;
 
     if (gamesState.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 40px;">No games added yet. Click "+ Add Executable" to start tracking!</div>`;
+      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 40px;">No games added yet. Drag & drop a .EXE file or click "+ Add Executable"!</div>`;
       return;
     }
 
-    // Show recent top 4 games on dashboard
     const recentGames = [...gamesState].slice(0, 4);
     grid.innerHTML = recentGames.map(createGameCardHTML).join('');
     bindCardEvents(grid);
@@ -142,24 +147,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     const grid = document.getElementById('library-games-grid');
     if (!grid) return;
 
-    if (gamesState.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 40px;">Your game library is currently empty.</div>`;
+    let displayGames = [...gamesState];
+    if (libraryFilter === 'favorites') {
+      displayGames = displayGames.filter(g => g.favorite);
+    }
+
+    if (displayGames.length === 0) {
+      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 40px;">No games match the current filter.</div>`;
       return;
     }
 
-    grid.innerHTML = gamesState.map(createGameCardHTML).join('');
+    grid.innerHTML = displayGames.map(createGameCardHTML).join('');
     bindCardEvents(grid);
   }
 
   function bindCardEvents(container) {
+    // Launch button
     container.querySelectorAll('.launch-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const gameId = btn.getAttribute('data-id');
         const game = gamesState.find(g => g.id === gameId);
         if (game) {
-          alert(`Simulating launch for: ${game.title}\nPath: ${game.exePath || 'Local executable'}`);
+          alert(`Launching offline game:\n${game.title}\nPath: ${game.exePath}`);
         }
+      });
+    });
+
+    // Favorite star button
+    container.querySelectorAll('.card-action-btn.favorite').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const gameId = btn.getAttribute('data-id');
+        if (window.electronAPI) {
+          gamesState = await window.electronAPI.toggleFavorite(gameId);
+        } else {
+          const game = gamesState.find(g => g.id === gameId);
+          if (game) game.favorite = !game.favorite;
+        }
+        renderAll();
+      });
+    });
+
+    // Edit button
+    container.querySelectorAll('.card-action-btn.edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const gameId = btn.getAttribute('data-id');
+        openEditModal(gameId);
       });
     });
   }
@@ -191,7 +226,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).join('');
   }
 
-  // Modal Handlers
+  // Library Filter Buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      libraryFilter = btn.getAttribute('data-filter');
+      renderLibraryGrid();
+    });
+  });
+
+  // Add Game Modal Handlers
   const modalAddGame = document.getElementById('modal-add-game');
   const btnAddGame = document.getElementById('btn-add-game');
   const btnCloseModal = document.getElementById('btn-close-modal');
@@ -201,22 +246,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const inputExePath = document.getElementById('input-exe-path');
   const inputGameTitle = document.getElementById('input-game-title');
+  const inputGameCompany = document.getElementById('input-game-company');
   const inputGameGenre = document.getElementById('input-game-genre');
   const inputGameCover = document.getElementById('input-game-cover');
 
-  if (btnAddGame) {
-    btnAddGame.addEventListener('click', () => {
-      modalAddGame?.classList.add('active');
-    });
-  }
+  btnAddGame?.addEventListener('click', () => modalAddGame?.classList.add('active'));
 
-  function closeModal() {
+  function closeAddModal() {
     modalAddGame?.classList.remove('active');
     formAddGame?.reset();
   }
 
-  btnCloseModal?.addEventListener('click', closeModal);
-  btnCancelModal?.addEventListener('click', closeModal);
+  btnCloseModal?.addEventListener('click', closeAddModal);
+  btnCancelModal?.addEventListener('click', closeAddModal);
 
   btnBrowseExe?.addEventListener('click', async () => {
     if (window.electronAPI) {
@@ -224,6 +266,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (selected) {
         inputExePath.value = selected.exePath || '';
         inputGameTitle.value = selected.title || '';
+        inputGameCompany.value = selected.company || '';
+        if (selected.coverImage) inputGameCover.value = selected.coverImage;
       }
     }
   });
@@ -233,6 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newGame = {
       exePath: inputExePath.value.trim(),
       title: inputGameTitle.value.trim(),
+      company: inputGameCompany.value.trim() || 'Unknown Publisher',
       genre: inputGameGenre.value.trim() || 'Offline Game',
       coverImage: inputGameCover.value.trim() || ''
     };
@@ -244,8 +289,138 @@ document.addEventListener('DOMContentLoaded', async () => {
       gamesState.push(newGame);
     }
 
-    closeModal();
+    closeAddModal();
     renderAll();
+  });
+
+  // Edit Game Modal Handlers
+  const modalEditGame = document.getElementById('modal-edit-game');
+  const formEditGame = document.getElementById('form-edit-game');
+  const btnCloseEditModal = document.getElementById('btn-close-edit-modal');
+  const btnCancelEditModal = document.getElementById('btn-cancel-edit-modal');
+  const btnDeleteGame = document.getElementById('btn-delete-game');
+
+  const editId = document.getElementById('edit-game-id');
+  const editTitle = document.getElementById('edit-game-title');
+  const editCompany = document.getElementById('edit-game-company');
+  const editGenre = document.getElementById('edit-game-genre');
+  const editPath = document.getElementById('edit-game-path');
+  const editCover = document.getElementById('edit-game-cover');
+
+  function openEditModal(gameId) {
+    const game = gamesState.find(g => g.id === gameId);
+    if (!game) return;
+
+    editId.value = game.id;
+    editTitle.value = game.title;
+    editCompany.value = game.company || '';
+    editGenre.value = game.genre || '';
+    editPath.value = game.exePath || '';
+    editCover.value = game.coverImage || '';
+
+    modalEditGame?.classList.add('active');
+  }
+
+  function closeEditModal() {
+    modalEditGame?.classList.remove('active');
+    formEditGame?.reset();
+  }
+
+  btnCloseEditModal?.addEventListener('click', closeEditModal);
+  btnCancelEditModal?.addEventListener('click', closeEditModal);
+
+  formEditGame?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const updated = {
+      id: editId.value,
+      title: editTitle.value.trim(),
+      company: editCompany.value.trim(),
+      genre: editGenre.value.trim(),
+      exePath: editPath.value.trim(),
+      coverImage: editCover.value.trim()
+    };
+
+    if (window.electronAPI) {
+      gamesState = await window.electronAPI.saveGame(updated);
+    } else {
+      const idx = gamesState.findIndex(g => g.id === updated.id);
+      if (idx >= 0) gamesState[idx] = { ...gamesState[idx], ...updated };
+    }
+
+    closeEditModal();
+    renderAll();
+  });
+
+  btnDeleteGame?.addEventListener('click', async () => {
+    const idToDelete = editId.value;
+    if (!idToDelete) return;
+
+    if (confirm('Are you sure you want to remove this game from your library?')) {
+      if (window.electronAPI) {
+        gamesState = await window.electronAPI.deleteGame(idToDelete);
+      } else {
+        gamesState = gamesState.filter(g => g.id !== idToDelete);
+      }
+      closeEditModal();
+      renderAll();
+    }
+  });
+
+  // Drag and Drop Executable Auto-Import
+  const dropzoneOverlay = document.getElementById('dropzone-overlay');
+  let dragCounter = 0;
+
+  window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    dropzoneOverlay?.classList.add('active');
+  });
+
+  window.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      dropzoneOverlay?.classList.remove('active');
+    }
+  });
+
+  window.addEventListener('dragover', (e) => e.preventDefault());
+
+  window.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropzoneOverlay?.classList.remove('active');
+
+    if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+      for (const file of e.dataTransfer.files) {
+        if (file.name.toLowerCase().endsWith('.exe')) {
+          console.log('[OGT Renderer] Auto-importing dropped executable:', file.path || file.name);
+          let parsedMeta = { title: file.name.replace('.exe', ''), exePath: file.path };
+          
+          if (window.electronAPI) {
+            parsedMeta = await window.electronAPI.parseExe(file.path);
+          }
+
+          const gameToSave = {
+            exePath: file.path,
+            title: parsedMeta.title || file.name.replace('.exe', ''),
+            productName: parsedMeta.productName || '',
+            company: parsedMeta.company || 'Unknown Publisher',
+            coverImage: parsedMeta.iconPath || '',
+            genre: 'Offline Game'
+          };
+
+          if (window.electronAPI) {
+            gamesState = await window.electronAPI.saveGame(gameToSave);
+          } else {
+            gameToSave.id = `game-${Date.now()}`;
+            gamesState.push(gameToSave);
+          }
+        }
+      }
+      renderAll();
+    }
   });
 
   // Search Bar Filter

@@ -194,6 +194,15 @@ class DatabaseService {
     return this.getGames();
   }
 
+  toggleFavorite(id) {
+    const game = this.getGameById(id);
+    if (game) {
+      game.favorite = !game.favorite;
+      this.save();
+    }
+    return this.getGames();
+  }
+
   // Sessions CRUD
   getSessions(gameId = null) {
     if (gameId) {

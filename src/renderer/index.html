@@ -8,6 +8,15 @@
 </head>
 <body>
   <div id="app-shell">
+    <!-- Drag & Drop Visual Overlay -->
+    <div id="dropzone-overlay" class="dropzone-overlay">
+      <div class="dropzone-box">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <h2>Drop Executable (.EXE) Here</h2>
+        <p>OGT will automatically parse metadata and add it to your library</p>
+      </div>
+    </div>
+
     <!-- Custom Frameless Titlebar -->
     <div class="titlebar">
       <div class="titlebar-brand">
@@ -127,6 +136,13 @@
         </section>
 
         <section id="view-library" class="view-panel" style="display: none;">
+          <!-- Library Filter Sub-bar -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <div class="filter-tabs">
+              <button class="filter-btn active" data-filter="all">All Games</button>
+              <button class="filter-btn" data-filter="favorites">⭐ Favorites</button>
+            </div>
+          </div>
           <div class="games-grid" id="library-games-grid">
             <!-- Rendered Dynamically -->
           </div>
@@ -189,6 +205,10 @@
           <input type="text" id="input-game-title" placeholder="e.g. Cyberpunk 2077" required>
         </div>
         <div class="form-group" style="margin-bottom: 14px;">
+          <label>Publisher / Developer</label>
+          <input type="text" id="input-game-company" placeholder="e.g. CD PROJEKT RED">
+        </div>
+        <div class="form-group" style="margin-bottom: 14px;">
           <label>Genre</label>
           <input type="text" id="input-game-genre" placeholder="e.g. Action RPG">
         </div>
@@ -199,6 +219,46 @@
         <div class="modal-actions">
           <button type="button" class="btn-secondary" id="btn-cancel-modal">Cancel</button>
           <button type="submit" class="btn-primary">Import Game</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Game Modal -->
+  <div class="modal-overlay" id="modal-edit-game">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Edit Game Metadata</h2>
+        <button class="control-btn" id="btn-close-edit-modal">✕</button>
+      </div>
+      <form id="form-edit-game">
+        <input type="hidden" id="edit-game-id">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label>Game Title</label>
+          <input type="text" id="edit-game-title" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label>Publisher / Company</label>
+          <input type="text" id="edit-game-company">
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label>Genre</label>
+          <input type="text" id="edit-game-genre">
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label>Executable Path</label>
+          <input type="text" id="edit-game-path">
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label>Cover Image URL / Path</label>
+          <input type="text" id="edit-game-cover">
+        </div>
+        <div class="modal-actions" style="justify-content: space-between; margin-top: 16px;">
+          <button type="button" class="btn-danger" id="btn-delete-game">Delete Game</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn-secondary" id="btn-cancel-edit-modal">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
         </div>
       </form>
     </div>

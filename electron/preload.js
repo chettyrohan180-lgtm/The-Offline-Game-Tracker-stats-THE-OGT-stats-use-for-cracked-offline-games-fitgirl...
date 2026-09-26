@@ -5,6 +5,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getGames: () => ipcRenderer.invoke('db:get-games'),
   saveGame: (gameData) => ipcRenderer.invoke('db:save-game', gameData),
   deleteGame: (id) => ipcRenderer.invoke('db:delete-game', id),
+  toggleFavorite: (id) => ipcRenderer.invoke('db:toggle-favorite', id),
+
+  // PE Header & Icon Extractor Bridge
+  parseExe: (filePath) => ipcRenderer.invoke('pe:parse-exe', filePath),
 
   // Playtime Sessions Bridge
   getSessions: (gameId) => ipcRenderer.invoke('db:get-sessions', gameId),

@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, Tray, Menu } = require('electron');
 const path = require('path');
 const db = require('./db');
+const PeParser = require('./peParser');
+const IconExtractor = require('./iconExtractor');
 
 let mainWindow = null;
 let tray = null;
@@ -11,7 +13,7 @@ function createWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 700,
-    frame: false, // Frameless window with custom glassmorphism titlebar
+    frame: false,
     backgroundColor: '#0a0d14',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -21,12 +23,10 @@ function createWindow() {
     }
   });
 
-  // Determine if running in Vite dev mode or production build
   const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
   
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     const distPath = path.join(__dirname, '../dist/renderer/index.html');
     if (require('fs').existsSync(distPath)) {
@@ -43,8 +43,7 @@ function createWindow() {
 
 function setupTray() {
   try {
-    // Create basic tray instance
-    tray = new Tray(path.join(__dirname, 'icon.png')); // Fallback icon path handled gracefully
+    tray = new Tray(path.join(__dirname, 'icon.png'));
     const contextMenu = Menu.buildFromTemplate([
       { label: 'OGT - Offline Game Tracker', enabled: false },
       { type: 'separator' },
@@ -59,16 +58,31 @@ function setupTray() {
         mainWindow.focus();
       }
     });
-  } catch (e) {
-    console.log('[OGT Tray] Tray initialized without custom icon PNG');
-  }
+  } catch (e) {}
 }
 
 function registerIpcHandlers() {
   // DB Games
   ipcMain.handle('db:get-games', () => db.getGames());
-  ipcMain.handle('db:save-game', (event, gameData) => db.saveGame(gameData));
+  
+  ipcMain.handle('db:save-game', async (event, gameData) => {
+    // If no cover/icon provided, extract thumbnail automatically
+    if (gameData.exePath && (!gameData.coverImage || gameData.coverImage === '')) {
+      const generatedIcon = await IconExtractor.extractIcon(gameData.exePath, gameData.id || `game-${Date.now()}`);
+      gameData.coverImage = generatedIcon;
+    }
+    return db.saveGame(gameData);
+  });
+
   ipcMain.handle('db:delete-game', (event, id) => db.deleteGame(id));
+  ipcMain.handle('db:toggle-favorite', (event, id) => db.toggleFavorite(id));
+
+  // PE Parsing & Icon Extractor
+  ipcMain.handle('pe:parse-exe', async (event, filePath) => {
+    const parsed = PeParser.parseExe(filePath);
+    const icon = await IconExtractor.extractIcon(filePath, 'temp-' + Date.now());
+    return { ...parsed, iconPath: icon };
+  });
 
   // DB Sessions
   ipcMain.handle('db:get-sessions', (event, gameId) => db.getSessions(gameId));
@@ -83,7 +97,7 @@ function registerIpcHandlers() {
   ipcMain.handle('db:update-settings', (event, settings) => db.updateSettings(settings));
   ipcMain.handle('app:get-version', () => app.getVersion());
 
-  // Dialogs
+  // Executable Picker Dialog
   ipcMain.handle('dialog:select-exe', async () => {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -91,31 +105,30 @@ function registerIpcHandlers() {
       filters: [{ name: 'Executables', extensions: ['exe'] }],
       properties: ['openFile']
     });
+
     if (!result.canceled && result.filePaths.length > 0) {
       const selectedPath = result.filePaths[0];
-      const exeName = path.basename(selectedPath, '.exe');
-      // Simple initial title formatting
-      const formattedTitle = exeName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const parsed = PeParser.parseExe(selectedPath);
+      const icon = await IconExtractor.extractIcon(selectedPath, 'game-' + Date.now());
+
       return {
         exePath: selectedPath,
-        title: formattedTitle,
-        productName: formattedTitle
+        title: parsed.title,
+        productName: parsed.productName,
+        company: parsed.company,
+        version: parsed.version,
+        coverImage: icon
       };
     }
     return null;
   });
 
   // Window controls
-  ipcMain.on('window:minimize', () => {
-    if (mainWindow) mainWindow.minimize();
-  });
+  ipcMain.on('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
   ipcMain.on('window:maximize', () => {
     if (mainWindow) {
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      } else {
-        mainWindow.maximize();
-      }
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
     }
   });
   ipcMain.on('window:close', () => {
@@ -134,14 +147,10 @@ app.whenReady().then(() => {
   setupTray();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
