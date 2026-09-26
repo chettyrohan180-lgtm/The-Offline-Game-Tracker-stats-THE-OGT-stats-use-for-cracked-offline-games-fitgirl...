@@ -5,6 +5,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# GSD Planning Context (Local Only)
+.planning/
+
 # Build outputs & Bundles
 dist/
 dist-electron/
