@@ -1,0 +1,25 @@
+{
+  "name": "ogt-offline-game-tracker",
+  "version": "1.0.0",
+  "description": "Offline Game Tracker (OGT) for Windows - Track playtime, sessions, and achievements",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "start": "electron .",
+    "build": "vite build"
+  },
+  "keywords": [
+    "game-tracker",
+    "offline-games",
+    "steam-emulator",
+    "playtime",
+    "achievements"
+  ],
+  "author": "OGT Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "vite": "^5.0.12"
+  },
+  "dependencies": {}
+}
