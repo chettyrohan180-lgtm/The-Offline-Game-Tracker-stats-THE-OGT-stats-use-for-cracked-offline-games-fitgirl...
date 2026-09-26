@@ -1,4 +1,4 @@
-// OGT Renderer Application Logic - Phase 4 Achievements & Save Scanner
+// OGT Renderer Application Logic - Phase 5 Hero View & Final UI Polish
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[OGT Renderer] Initializing application UI shell...');
@@ -143,6 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderAll() {
     renderStats();
+    renderPlaytimeChart();
     renderDashboardGrid();
     renderLibraryGrid();
     renderSessionsList();
@@ -162,6 +163,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const unlockedCount = achievementsState.filter(a => a.isUnlocked).length;
     if (totalAchievementsEl) totalAchievementsEl.textContent = unlockedCount;
+  }
+
+  // Render Playtime Distribution Chart
+  function renderPlaytimeChart() {
+    const chartContainer = document.getElementById('dashboard-playtime-chart');
+    if (!chartContainer) return;
+
+    if (gamesState.length === 0) {
+      chartContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 13px;">No playtime data available.</div>`;
+      return;
+    }
+
+    const sortedGames = [...gamesState].sort((a, b) => (b.totalPlaytimeMinutes || 0) - (a.totalPlaytimeMinutes || 0)).slice(0, 4);
+    const maxMins = Math.max(...sortedGames.map(g => g.totalPlaytimeMinutes || 0), 1);
+
+    chartContainer.innerHTML = sortedGames.map(g => {
+      const hours = ((g.totalPlaytimeMinutes || 0) / 60).toFixed(1);
+      const percent = Math.max(5, Math.round(((g.totalPlaytimeMinutes || 0) / maxMins) * 100));
+
+      return `
+        <div class="chart-item">
+          <span class="chart-label" title="${g.title}">${g.title}</span>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width: ${percent}%;"></div>
+          </div>
+          <span class="chart-value">${hours}h</span>
+        </div>
+      `;
+    }).join('');
   }
 
   function createGameCardHTML(game) {
@@ -230,6 +260,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function bindCardEvents(container) {
+    // Open Game Detail Hero View on Card Click
+    container.querySelectorAll('.game-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        // Ignore if clicking action buttons inside card
+        if (e.target.closest('.card-top-actions') || e.target.closest('.launch-btn')) return;
+        const gameId = card.getAttribute('data-id');
+        openHeroModal(gameId);
+      });
+    });
+
+    // Launch button
     container.querySelectorAll('.launch-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -246,6 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // Favorite star button
     container.querySelectorAll('.card-action-btn.favorite').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -257,6 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // Edit button
     container.querySelectorAll('.card-action-btn.edit').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -300,6 +343,75 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).join('');
   }
 
+  // Hero Modal Handlers
+  const modalGameDetail = document.getElementById('modal-game-detail');
+  const btnCloseHeroModal = document.getElementById('btn-close-hero-modal');
+  const heroBackdrop = document.getElementById('hero-backdrop-container');
+  const heroTitle = document.getElementById('hero-game-title');
+  const heroMeta = document.getElementById('hero-game-meta');
+  const heroPlaytimeVal = document.getElementById('hero-playtime-val');
+  const heroCompletionVal = document.getElementById('hero-completion-val');
+  const heroLastPlayedVal = document.getElementById('hero-lastplayed-val');
+  const heroBtnLaunch = document.getElementById('hero-btn-launch');
+  const heroSessionsContainer = document.getElementById('hero-sessions-container');
+  const heroAchievementsContainer = document.getElementById('hero-achievements-container');
+
+  function openHeroModal(gameId) {
+    const game = gamesState.find(g => g.id === gameId);
+    if (!game) return;
+
+    const banner = game.bannerImage || game.coverImage || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop';
+    if (heroBackdrop) heroBackdrop.style.backgroundImage = `url('${banner}')`;
+    if (heroTitle) heroTitle.textContent = game.title;
+    if (heroMeta) heroMeta.textContent = `${game.company || 'Unknown Publisher'} • ${game.genre || 'Offline Game'}`;
+    
+    const hours = ((game.totalPlaytimeMinutes || 0) / 60).toFixed(1);
+    if (heroPlaytimeVal) heroPlaytimeVal.textContent = `${hours}h`;
+    if (heroCompletionVal) heroCompletionVal.textContent = `${game.completionPercentage || 0}%`;
+    if (heroLastPlayedVal) heroLastPlayedVal.textContent = game.lastPlayed ? new Date(game.lastPlayed).toLocaleDateString() : 'Never';
+
+    if (heroBtnLaunch) {
+      heroBtnLaunch.onclick = async () => {
+        if (window.electronAPI) await window.electronAPI.launchGame(game.id);
+        modalGameDetail?.classList.remove('active');
+      };
+    }
+
+    // Populate game specific sessions
+    const gameSessions = sessionsState.filter(s => s.gameId === gameId).reverse();
+    if (heroSessionsContainer) {
+      if (gameSessions.length === 0) {
+        heroSessionsContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 12px;">No logged sessions yet.</div>`;
+      } else {
+        heroSessionsContainer.innerHTML = gameSessions.map(s => `
+          <div style="font-size: 12px; color: var(--text-muted); padding: 8px; background: rgba(255,255,255,0.03); border-radius: 6px; display: flex; justify-content: space-between;">
+            <span>${s.dateFormatted || 'Recently'}</span>
+            <strong style="color: var(--accent-cyan);">${Math.max(1, Math.round((s.durationSeconds || 0) / 60))} mins</strong>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Populate game specific achievements
+    const gameAchs = achievementsState.filter(a => a.gameId === gameId);
+    if (heroAchievementsContainer) {
+      if (gameAchs.length === 0) {
+        heroAchievementsContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 12px;">No achievements scanned.</div>`;
+      } else {
+        heroAchievementsContainer.innerHTML = gameAchs.map(a => `
+          <div style="font-size: 12px; padding: 8px; background: rgba(255,255,255,0.03); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: ${a.isUnlocked ? '#fff' : 'var(--text-muted)'};">${a.isUnlocked ? '🏆' : '🔒'} ${a.title || a.key}</span>
+            <span style="color: ${a.isUnlocked ? 'var(--accent-emerald)' : 'var(--text-muted)'}; font-size: 11px;">${a.isUnlocked ? 'Unlocked' : 'Locked'}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    modalGameDetail?.classList.add('active');
+  }
+
+  btnCloseHeroModal?.addEventListener('click', () => modalGameDetail?.classList.remove('active'));
+
   // Render Achievements View
   async function renderAchievementsView() {
     const selectEl = document.getElementById('ach-game-select');
@@ -311,7 +423,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!selectEl || !grid) return;
 
-    // Populate game selector options
     if (gamesState.length > 0) {
       selectEl.innerHTML = gamesState.map(g => `<option value="${g.id}">${g.title}</option>`).join('');
       if (!selectedAchGameId || !gamesState.some(g => g.id === selectedAchGameId)) {
@@ -329,7 +440,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (titleBanner) titleBanner.textContent = `${selectedGame.title} Achievements`;
 
-    // Fetch achievements for selected game
     let gameAchs = [];
     if (window.electronAPI) {
       gameAchs = await window.electronAPI.getAchievements(selectedAchGameId);
@@ -369,7 +479,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     }).join('');
 
-    // Bind manual achievement toggle buttons
     grid.querySelectorAll('.ach-toggle-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const achId = btn.getAttribute('data-id');
@@ -382,13 +491,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Theme Accent Customizer
+  const themeAccentSelect = document.getElementById('setting-theme-accent');
+  themeAccentSelect?.addEventListener('change', (e) => {
+    const val = e.target.value;
+    const colors = {
+      indigo: '#6366f1',
+      cyan: '#00f2fe',
+      emerald: '#10b981',
+      amber: '#f59e0b'
+    };
+    if (colors[val]) {
+      document.documentElement.style.setProperty('--primary', colors[val]);
+    }
+  });
+
   // Game Selector Change Listener
   document.getElementById('ach-game-select')?.addEventListener('change', (e) => {
     selectedAchGameId = e.target.value;
     renderAchievementsView();
   });
 
-  // Scan Achievements Button Handler
   document.getElementById('btn-scan-achievements')?.addEventListener('click', async () => {
     if (!selectedAchGameId) return;
     if (window.electronAPI) {

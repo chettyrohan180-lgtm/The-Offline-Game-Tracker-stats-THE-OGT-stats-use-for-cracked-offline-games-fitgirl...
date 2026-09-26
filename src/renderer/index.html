@@ -155,6 +155,14 @@
 
         <!-- View Containers -->
         <section id="view-dashboard" class="view-panel">
+          <!-- Playtime Distribution Chart -->
+          <div style="background: var(--bg-card); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-md); padding: 22px; margin-bottom: 24px;">
+            <h3 style="font-family: var(--font-heading); font-size: 16px; color: #fff; margin-bottom: 16px;">Top Played Games Breakdown</h3>
+            <div id="dashboard-playtime-chart" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Rendered Dynamically -->
+            </div>
+          </div>
+
           <h2 style="font-family: var(--font-heading); font-size: 18px; margin-bottom: 16px; color: #fff;">Recent Library Activity</h2>
           <div class="games-grid" id="dashboard-games-grid">
             <!-- Rendered Dynamically -->
@@ -175,12 +183,10 @@
 
         <section id="view-achievements" class="view-panel" style="display: none;">
           <div style="background: var(--bg-card); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-md); padding: 24px; display: flex; flex-direction: column; gap: 20px;">
-            <!-- Game Selector & Control Bar -->
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <label style="color: var(--text-muted); font-size: 14px; font-weight: 600;">Select Game:</label>
                 <select id="ach-game-select" style="background: var(--bg-glass); border: 1px solid var(--bg-glass-border); color: #fff; padding: 10px 16px; border-radius: var(--border-radius-sm); font-size: 14px; outline: none; min-width: 220px; font-weight: 600;">
-                  <!-- Options added dynamically -->
                 </select>
               </div>
 
@@ -191,7 +197,6 @@
               </div>
             </div>
 
-            <!-- Completion Progress Bar Banner -->
             <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-md); padding: 18px 24px;">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                 <strong style="color: #fff; font-size: 16px; font-family: var(--font-heading);" id="ach-game-title-banner">Select a game to view achievements</strong>
@@ -206,9 +211,7 @@
               </div>
             </div>
 
-            <!-- Achievements Grid -->
             <div id="achievements-grid" class="achievements-grid">
-              <!-- Rendered Dynamically -->
             </div>
           </div>
         </section>
@@ -218,7 +221,6 @@
             <h3 style="color: #fff; margin-bottom: 12px; font-family: var(--font-heading);">Playtime History & Logs</h3>
             <p style="color: var(--text-muted); font-size: 14px;">Detailed breakdown of offline gaming sessions recorded by OGT process watcher.</p>
             <div id="sessions-list-container" style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
-              <!-- Sessions rendered here -->
             </div>
           </div>
         </section>
@@ -227,6 +229,16 @@
           <div style="background: var(--bg-card); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-md); padding: 28px; max-width: 600px; display: flex; flex-direction: column; gap: 20px;">
             <h3 style="color: #fff; font-family: var(--font-heading); font-size: 20px;">Tracker Preferences</h3>
             
+            <div class="form-group">
+              <label>Theme Accent Color</label>
+              <select id="setting-theme-accent" style="background: rgba(255,255,255,0.04); border: 1px solid var(--bg-glass-border); color: #fff; padding: 12px; border-radius: var(--border-radius-sm); outline: none;">
+                <option value="indigo">Indigo / Violet (Default)</option>
+                <option value="cyan">Neon Cyan</option>
+                <option value="emerald">Emerald Green</option>
+                <option value="amber">Amber Gold</option>
+              </select>
+            </div>
+
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <div>
                 <strong style="color: #fff; display: block;">Minimize to Tray</strong>
@@ -247,6 +259,51 @@
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <!-- Game Detail Hero Modal -->
+  <div class="modal-overlay" id="modal-game-detail">
+    <div class="modal-card hero-modal-card">
+      <div class="hero-modal-header" id="hero-backdrop-container">
+        <div class="hero-overlay"></div>
+        <button class="control-btn hero-close-btn" id="btn-close-hero-modal">✕</button>
+        <div class="hero-header-content">
+          <h1 id="hero-game-title">Cyberpunk 2077</h1>
+          <p id="hero-game-meta">CD PROJEKT RED • Action RPG</p>
+        </div>
+      </div>
+      
+      <div class="hero-modal-body">
+        <div class="hero-stats-row">
+          <div class="hero-stat-box">
+            <span class="hero-stat-label">Total Playtime</span>
+            <span class="hero-stat-value" id="hero-playtime-val">0h</span>
+          </div>
+          <div class="hero-stat-box">
+            <span class="hero-stat-label">Completion</span>
+            <span class="hero-stat-value" id="hero-completion-val">0%</span>
+          </div>
+          <div class="hero-stat-box">
+            <span class="hero-stat-label">Last Played</span>
+            <span class="hero-stat-value" id="hero-lastplayed-val">Never</span>
+          </div>
+          <button class="btn-primary hero-launch-btn" id="hero-btn-launch">Launch Game</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 10px;">
+          <div>
+            <h4 style="color: #fff; font-family: var(--font-heading); margin-bottom: 12px;">Session History</h4>
+            <div id="hero-sessions-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+            </div>
+          </div>
+          <div>
+            <h4 style="color: #fff; font-family: var(--font-heading); margin-bottom: 12px;">Achievements Overview</h4>
+            <div id="hero-achievements-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
