@@ -61,6 +61,82 @@ body {
     radial-gradient(circle at 50% 50%, rgba(0, 242, 254, 0.03) 0%, transparent 60%);
 }
 
+/* Live Active Session Banner */
+.active-session-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 78, 59, 0.25));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: var(--border-radius-md);
+  padding: 16px 24px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.15);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.active-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.pulsing-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-emerald);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-emerald);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--accent-emerald);
+  animation: pulse-glow 1.5s infinite;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 16px var(--accent-emerald); }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.active-game-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+.active-game-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--border-radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--bg-glass-border);
+}
+
+.active-timer-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.active-timer-digits {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
 /* Drag & Drop Visual Overlay */
 .dropzone-overlay {
   position: fixed;
@@ -472,6 +548,11 @@ body {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
 }
 
+.game-card.playing {
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.3);
+}
+
 .game-cover {
   height: 140px;
   width: 100%;
@@ -559,8 +640,19 @@ body {
   transition: var(--transition-fast);
 }
 
+.launch-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-emerald);
+  border-color: var(--accent-emerald);
+}
+
 .game-card:hover .launch-btn {
   background: var(--primary);
+  color: #fff;
+}
+
+.game-card:hover .launch-btn.active {
+  background: var(--accent-emerald);
   color: #fff;
 }
 

@@ -3,6 +3,7 @@ const path = require('path');
 const db = require('./db');
 const PeParser = require('./peParser');
 const IconExtractor = require('./iconExtractor');
+const processWatcher = require('./processWatcher');
 
 let mainWindow = null;
 let tray = null;
@@ -36,6 +37,9 @@ function createWindow() {
     }
   }
 
+  // Initialize process watcher with main window instance
+  processWatcher.init(mainWindow);
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -66,7 +70,6 @@ function registerIpcHandlers() {
   ipcMain.handle('db:get-games', () => db.getGames());
   
   ipcMain.handle('db:save-game', async (event, gameData) => {
-    // If no cover/icon provided, extract thumbnail automatically
     if (gameData.exePath && (!gameData.coverImage || gameData.coverImage === '')) {
       const generatedIcon = await IconExtractor.extractIcon(gameData.exePath, gameData.id || `game-${Date.now()}`);
       gameData.coverImage = generatedIcon;
@@ -76,6 +79,11 @@ function registerIpcHandlers() {
 
   ipcMain.handle('db:delete-game', (event, id) => db.deleteGame(id));
   ipcMain.handle('db:toggle-favorite', (event, id) => db.toggleFavorite(id));
+
+  // Game Launcher & Process Watcher Channels
+  ipcMain.handle('game:launch', (event, gameId) => processWatcher.launchGame(gameId));
+  ipcMain.handle('game:stop-session', (event, gameId) => processWatcher.stopSession(gameId));
+  ipcMain.handle('game:get-active-sessions', () => processWatcher.getActiveSessions());
 
   // PE Parsing & Icon Extractor
   ipcMain.handle('pe:parse-exe', async (event, filePath) => {
@@ -152,5 +160,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  processWatcher.stopPolling();
   if (process.platform !== 'darwin') app.quit();
 });

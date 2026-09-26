@@ -7,6 +7,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteGame: (id) => ipcRenderer.invoke('db:delete-game', id),
   toggleFavorite: (id) => ipcRenderer.invoke('db:toggle-favorite', id),
 
+  // Game Launcher & Process Tracking Bridge
+  launchGame: (gameId) => ipcRenderer.invoke('game:launch', gameId),
+  stopGameSession: (gameId) => ipcRenderer.invoke('game:stop-session', gameId),
+  getActiveSessions: () => ipcRenderer.invoke('game:get-active-sessions'),
+
+  // Real-time Event Subscriptions
+  onSessionStarted: (callback) => ipcRenderer.on('tracker:session-started', (e, data) => callback(data)),
+  onSessionTick: (callback) => ipcRenderer.on('tracker:session-tick', (e, data) => callback(data)),
+  onSessionStopped: (callback) => ipcRenderer.on('tracker:session-stopped', (e, data) => callback(data)),
+
   // PE Header & Icon Extractor Bridge
   parseExe: (filePath) => ipcRenderer.invoke('pe:parse-exe', filePath),
 

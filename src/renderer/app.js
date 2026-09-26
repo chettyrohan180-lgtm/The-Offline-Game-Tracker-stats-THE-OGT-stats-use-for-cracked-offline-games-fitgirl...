@@ -1,4 +1,4 @@
-// OGT Renderer Application Logic - Phase 2 Enhanced
+// OGT Renderer Application Logic - Phase 3 Process & Playtime Tracking
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[OGT Renderer] Initializing application UI shell...');
@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let gamesState = [];
   let sessionsState = [];
   let achievementsState = [];
+  let activeSessionsState = [];
   let activeView = 'dashboard';
   let libraryFilter = 'all';
 
@@ -21,6 +22,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const viewTitle = document.getElementById('view-title');
   const viewSubtitle = document.getElementById('view-subtitle');
 
+  // Live Session Banner Elements
+  const activeSessionBanner = document.getElementById('active-session-banner');
+  const activeGameTitle = document.getElementById('active-game-title');
+  const activeGameCover = document.getElementById('active-game-cover');
+  const activeGameTimer = document.getElementById('active-game-timer');
+  const btnStopActiveSession = document.getElementById('btn-stop-active-session');
+
   // Window Controls
   const btnMin = document.getElementById('btn-min');
   const btnMax = document.getElementById('btn-max');
@@ -30,6 +38,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnMin?.addEventListener('click', () => window.electronAPI.minimizeWindow());
     btnMax?.addEventListener('click', () => window.electronAPI.maximizeWindow());
     btnClose?.addEventListener('click', () => window.electronAPI.closeWindow());
+
+    // Subscribe to Process Watcher IPC Events
+    window.electronAPI.onSessionStarted((sessionData) => {
+      console.log('[OGT Renderer] Session STARTED:', sessionData);
+      updateActiveSessionUI(sessionData);
+      renderAll();
+    });
+
+    window.electronAPI.onSessionTick((sessionData) => {
+      updateActiveSessionUI(sessionData);
+    });
+
+    window.electronAPI.onSessionStopped(async (data) => {
+      console.log('[OGT Renderer] Session STOPPED:', data);
+      hideActiveSessionUI();
+      await loadData();
+    });
+  }
+
+  function formatHHMMSS(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return [hrs, mins, secs].map(v => v.toString().padStart(2, '0')).join(':');
+  }
+
+  function updateActiveSessionUI(sessionData) {
+    if (!sessionData) return;
+    
+    if (activeSessionBanner) activeSessionBanner.style.display = 'block';
+    if (activeGameTitle) activeGameTitle.textContent = sessionData.title || 'Offline Game';
+    if (activeGameCover) activeGameCover.src = sessionData.coverImage || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
+    if (activeGameTimer) activeGameTimer.textContent = formatHHMMSS(sessionData.durationSeconds || 0);
+
+    if (btnStopActiveSession) {
+      btnStopActiveSession.onclick = () => {
+        if (window.electronAPI) window.electronAPI.stopGameSession(sessionData.gameId);
+      };
+    }
+  }
+
+  function hideActiveSessionUI() {
+    if (activeSessionBanner) activeSessionBanner.style.display = 'none';
   }
 
   // Navigation Router
@@ -74,8 +125,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         gamesState = await window.electronAPI.getGames();
         sessionsState = await window.electronAPI.getSessions();
         achievementsState = await window.electronAPI.getAchievements();
-      } else {
-        console.warn('[OGT Renderer] Running in standalone browser preview');
+        activeSessionsState = await window.electronAPI.getActiveSessions();
+
+        if (activeSessionsState.length > 0) {
+          updateActiveSessionUI(activeSessionsState[0]);
+        }
       }
       renderAll();
     } catch (err) {
@@ -109,9 +163,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const hours = ((game.totalPlaytimeMinutes || 0) / 60).toFixed(1);
     const cover = game.coverImage || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
     const favClass = game.favorite ? 'active' : '';
+    
+    const isPlaying = activeSessionsState.some(s => s.gameId === game.id);
+    const playingCardClass = isPlaying ? 'playing' : '';
+    const launchBtnText = isPlaying ? 'Playing... (Click to Stop)' : 'Launch Game';
+    const launchBtnClass = isPlaying ? 'launch-btn active' : 'launch-btn';
 
     return `
-      <div class="game-card" data-id="${game.id}">
+      <div class="game-card ${playingCardClass}" data-id="${game.id}">
         <div class="card-top-actions">
           <button class="card-action-btn favorite ${favClass}" data-id="${game.id}" title="Toggle Favorite">⭐</button>
           <button class="card-action-btn edit" data-id="${game.id}" title="Edit Game">⚙️</button>
@@ -123,7 +182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <span>${game.company || game.genre || 'Offline Game'}</span>
             <span class="game-playtime">${hours}h</span>
           </div>
-          <button class="launch-btn" data-id="${game.id}">Launch Game</button>
+          <button class="${launchBtnClass}" data-id="${game.id}">${launchBtnText}</button>
         </div>
       </div>
     `;
@@ -162,14 +221,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function bindCardEvents(container) {
-    // Launch button
+    // Launch / Stop button
     container.querySelectorAll('.launch-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const gameId = btn.getAttribute('data-id');
-        const game = gamesState.find(g => g.id === gameId);
-        if (game) {
-          alert(`Launching offline game:\n${game.title}\nPath: ${game.exePath}`);
+        const isPlaying = activeSessionsState.some(s => s.gameId === gameId);
+        
+        if (isPlaying) {
+          if (window.electronAPI) window.electronAPI.stopGameSession(gameId);
+        } else {
+          if (window.electronAPI) {
+            const res = await window.electronAPI.launchGame(gameId);
+            console.log('[OGT Renderer] Game launch result:', res);
+          } else {
+            alert('Launching game preview...');
+          }
         }
       });
     });
@@ -208,18 +275,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    container.innerHTML = sessionsState.map(s => {
+    // Sort newest session first
+    const sortedSessions = [...sessionsState].reverse();
+
+    container.innerHTML = sortedSessions.map(s => {
       const game = gamesState.find(g => g.id === s.gameId);
       const title = game ? game.title : 'Offline Game';
-      const mins = Math.round((s.durationSeconds || 0) / 60);
+      const mins = Math.max(1, Math.round((s.durationSeconds || 0) / 60));
+      const secs = s.durationSeconds % 60;
+
       return `
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-sm);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(255,255,255,0.03); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-sm);">
           <div>
-            <strong style="color: #fff;">${title}</strong>
-            <span style="font-size: 12px; color: var(--text-muted); display: block;">Logged: ${s.dateFormatted || 'Recently'}</span>
+            <strong style="color: #fff; font-size: 15px;">${title}</strong>
+            <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 2px;">Logged: ${s.dateFormatted || s.startTime}</span>
           </div>
-          <div style="font-weight: 700; color: var(--accent-cyan); font-family: var(--font-heading);">
-            ${mins} mins session
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: var(--accent-cyan); font-family: var(--font-heading); font-size: 16px;">
+              ${mins}m ${secs}s
+            </div>
+            <span style="font-size: 11px; color: var(--accent-emerald);">Verified Offline Session</span>
           </div>
         </div>
       `;
@@ -395,9 +470,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.dataTransfer && e.dataTransfer.files.length > 0) {
       for (const file of e.dataTransfer.files) {
         if (file.name.toLowerCase().endsWith('.exe')) {
-          console.log('[OGT Renderer] Auto-importing dropped executable:', file.path || file.name);
           let parsedMeta = { title: file.name.replace('.exe', ''), exePath: file.path };
-          
           if (window.electronAPI) {
             parsedMeta = await window.electronAPI.parseExe(file.path);
           }

@@ -96,6 +96,28 @@
           </div>
         </div>
 
+        <!-- Live Active Session Banner (Shown when a game is running) -->
+        <div id="active-session-banner" class="active-session-banner" style="display: none;">
+          <div class="active-banner-content">
+            <div class="pulsing-live-badge">
+              <span class="pulse-dot"></span>
+              <span>LIVE TRACKING</span>
+            </div>
+            <div class="active-game-info">
+              <img id="active-game-cover" class="active-game-cover" src="" alt="Active Game">
+              <div>
+                <h3 id="active-game-title" style="color: #fff; font-family: var(--font-heading); font-size: 18px;">Game Title</h3>
+                <span style="color: var(--text-muted); font-size: 13px;">Process Active • Logging Session</span>
+              </div>
+            </div>
+            <div class="active-timer-box">
+              <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px;">Session Duration</span>
+              <div id="active-game-timer" class="active-timer-digits">00:00:00</div>
+            </div>
+            <button class="btn-danger" id="btn-stop-active-session" style="font-size: 13px;">Stop Tracking</button>
+          </div>
+        </div>
+
         <!-- Stat Summary Banner -->
         <div class="stats-banner">
           <div class="stat-card">
@@ -136,7 +158,6 @@
         </section>
 
         <section id="view-library" class="view-panel" style="display: none;">
-          <!-- Library Filter Sub-bar -->
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
             <div class="filter-tabs">
               <button class="filter-btn active" data-filter="all">All Games</button>
