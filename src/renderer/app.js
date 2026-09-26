@@ -1,4 +1,4 @@
-// OGT Renderer Application Logic - Phase 3 Process & Playtime Tracking
+// OGT Renderer Application Logic - Phase 4 Achievements & Save Scanner
 
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[OGT Renderer] Initializing application UI shell...');
@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let sessionsState = [];
   let achievementsState = [];
   let activeSessionsState = [];
+  let selectedAchGameId = null;
   let activeView = 'dashboard';
   let libraryFilter = 'all';
 
@@ -16,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const viewPanels = {
     dashboard: document.getElementById('view-dashboard'),
     library: document.getElementById('view-library'),
+    achievements: document.getElementById('view-achievements'),
     sessions: document.getElementById('view-sessions'),
     settings: document.getElementById('view-settings')
   };
@@ -39,9 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnMax?.addEventListener('click', () => window.electronAPI.maximizeWindow());
     btnClose?.addEventListener('click', () => window.electronAPI.closeWindow());
 
-    // Subscribe to Process Watcher IPC Events
     window.electronAPI.onSessionStarted((sessionData) => {
-      console.log('[OGT Renderer] Session STARTED:', sessionData);
       updateActiveSessionUI(sessionData);
       renderAll();
     });
@@ -51,7 +51,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     window.electronAPI.onSessionStopped(async (data) => {
-      console.log('[OGT Renderer] Session STOPPED:', data);
       hideActiveSessionUI();
       await loadData();
     });
@@ -110,12 +109,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const subtitles = {
       dashboard: 'Overview of your offline gaming activity & stats',
       library: 'Manage and launch your imported game executables',
+      achievements: 'Track offline game completion percentage and unlocked badges',
       sessions: 'History of game playtime logs and session durations',
       settings: 'Configure background tracking and application preferences'
     };
 
     if (viewTitle) viewTitle.textContent = viewName.charAt(0).toUpperCase() + viewName.slice(1);
     if (viewSubtitle) viewSubtitle.textContent = subtitles[viewName] || '';
+
+    if (viewName === 'achievements') {
+      renderAchievementsView();
+    }
   }
 
   // Load Data from Database IPC
@@ -142,6 +146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderDashboardGrid();
     renderLibraryGrid();
     renderSessionsList();
+    renderAchievementsView();
   }
 
   function renderStats() {
@@ -163,6 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const hours = ((game.totalPlaytimeMinutes || 0) / 60).toFixed(1);
     const cover = game.coverImage || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
     const favClass = game.favorite ? 'active' : '';
+    const completion = game.completionPercentage || 0;
     
     const isPlaying = activeSessionsState.some(s => s.gameId === game.id);
     const playingCardClass = isPlaying ? 'playing' : '';
@@ -181,6 +187,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="game-meta">
             <span>${game.company || game.genre || 'Offline Game'}</span>
             <span class="game-playtime">${hours}h</span>
+          </div>
+          <div style="font-size: 11px; color: var(--accent-emerald); font-weight: 700; margin-top: 2px;">
+            ${completion}% Completed
           </div>
           <button class="${launchBtnClass}" data-id="${game.id}">${launchBtnText}</button>
         </div>
@@ -221,7 +230,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function bindCardEvents(container) {
-    // Launch / Stop button
     container.querySelectorAll('.launch-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -232,31 +240,23 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (window.electronAPI) window.electronAPI.stopGameSession(gameId);
         } else {
           if (window.electronAPI) {
-            const res = await window.electronAPI.launchGame(gameId);
-            console.log('[OGT Renderer] Game launch result:', res);
-          } else {
-            alert('Launching game preview...');
+            await window.electronAPI.launchGame(gameId);
           }
         }
       });
     });
 
-    // Favorite star button
     container.querySelectorAll('.card-action-btn.favorite').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const gameId = btn.getAttribute('data-id');
         if (window.electronAPI) {
           gamesState = await window.electronAPI.toggleFavorite(gameId);
-        } else {
-          const game = gamesState.find(g => g.id === gameId);
-          if (game) game.favorite = !game.favorite;
         }
         renderAll();
       });
     });
 
-    // Edit button
     container.querySelectorAll('.card-action-btn.edit').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -275,7 +275,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Sort newest session first
     const sortedSessions = [...sessionsState].reverse();
 
     container.innerHTML = sortedSessions.map(s => {
@@ -300,6 +299,104 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
     }).join('');
   }
+
+  // Render Achievements View
+  async function renderAchievementsView() {
+    const selectEl = document.getElementById('ach-game-select');
+    const titleBanner = document.getElementById('ach-game-title-banner');
+    const percentText = document.getElementById('ach-percent-text');
+    const progressFill = document.getElementById('ach-progress-fill');
+    const countText = document.getElementById('ach-count-text');
+    const grid = document.getElementById('achievements-grid');
+
+    if (!selectEl || !grid) return;
+
+    // Populate game selector options
+    if (gamesState.length > 0) {
+      selectEl.innerHTML = gamesState.map(g => `<option value="${g.id}">${g.title}</option>`).join('');
+      if (!selectedAchGameId || !gamesState.some(g => g.id === selectedAchGameId)) {
+        selectedAchGameId = gamesState[0].id;
+      }
+      selectEl.value = selectedAchGameId;
+    } else {
+      selectEl.innerHTML = `<option value="">No Games Added</option>`;
+      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); padding: 40px; text-align: center;">Add games to view achievements.</div>`;
+      return;
+    }
+
+    const selectedGame = gamesState.find(g => g.id === selectedAchGameId);
+    if (!selectedGame) return;
+
+    if (titleBanner) titleBanner.textContent = `${selectedGame.title} Achievements`;
+
+    // Fetch achievements for selected game
+    let gameAchs = [];
+    if (window.electronAPI) {
+      gameAchs = await window.electronAPI.getAchievements(selectedAchGameId);
+    } else {
+      gameAchs = achievementsState.filter(a => a.gameId === selectedAchGameId);
+    }
+
+    const totalCount = gameAchs.length;
+    const unlockedCount = gameAchs.filter(a => a.isUnlocked).length;
+    const percent = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
+
+    if (percentText) percentText.textContent = `${percent}%`;
+    if (progressFill) progressFill.style.width = `${percent}%`;
+    if (countText) countText.textContent = `${unlockedCount} / ${totalCount} Unlocked`;
+
+    if (gameAchs.length === 0) {
+      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); padding: 40px; text-align: center;">No achievements found for this game. Click "Scan Save Files" to auto-detect Goldberg or INI saves.</div>`;
+      return;
+    }
+
+    grid.innerHTML = gameAchs.map(a => {
+      const cardClass = a.isUnlocked ? 'ach-card unlocked' : 'ach-card locked';
+      const badgeIcon = a.isUnlocked ? '🏆' : '🔒';
+      const dateText = a.isUnlocked ? (a.unlockedAt ? `Unlocked: ${new Date(a.unlockedAt).toLocaleDateString()}` : 'Unlocked') : 'Locked';
+      const btnText = a.isUnlocked ? 'Mark Locked' : 'Mark Unlocked';
+
+      return `
+        <div class="${cardClass}">
+          <div class="ach-icon-box">${badgeIcon}</div>
+          <div class="ach-details">
+            <div class="ach-title">${a.title || a.key}</div>
+            <div class="ach-desc">${a.description || 'Offline achievement'}</div>
+            <div class="ach-date">${dateText}</div>
+            <button class="ach-toggle-btn" data-id="${a.id}" data-state="${a.isUnlocked}">${btnText}</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Bind manual achievement toggle buttons
+    grid.querySelectorAll('.ach-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const achId = btn.getAttribute('data-id');
+        const currentState = btn.getAttribute('data-state') === 'true';
+        if (window.electronAPI) {
+          await window.electronAPI.toggleAchievement(achId, !currentState);
+          await loadData();
+        }
+      });
+    });
+  }
+
+  // Game Selector Change Listener
+  document.getElementById('ach-game-select')?.addEventListener('change', (e) => {
+    selectedAchGameId = e.target.value;
+    renderAchievementsView();
+  });
+
+  // Scan Achievements Button Handler
+  document.getElementById('btn-scan-achievements')?.addEventListener('click', async () => {
+    if (!selectedAchGameId) return;
+    if (window.electronAPI) {
+      const scanRes = await window.electronAPI.scanAchievements(selectedAchGameId);
+      alert(`Save Scan Complete!\nScanned: ${scanRes.totalCount} achievements\nCompletion: ${scanRes.completionPercentage}%`);
+      await loadData();
+    }
+  });
 
   // Library Filter Buttons
   document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -359,9 +456,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (window.electronAPI) {
       gamesState = await window.electronAPI.saveGame(newGame);
-    } else {
-      newGame.id = `game-${Date.now()}`;
-      gamesState.push(newGame);
     }
 
     closeAddModal();
@@ -374,12 +468,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCloseEditModal = document.getElementById('btn-close-edit-modal');
   const btnCancelEditModal = document.getElementById('btn-cancel-edit-modal');
   const btnDeleteGame = document.getElementById('btn-delete-game');
+  const btnBrowseSavePath = document.getElementById('btn-browse-save-path');
 
   const editId = document.getElementById('edit-game-id');
   const editTitle = document.getElementById('edit-game-title');
   const editCompany = document.getElementById('edit-game-company');
   const editGenre = document.getElementById('edit-game-genre');
   const editPath = document.getElementById('edit-game-path');
+  const editSavePath = document.getElementById('edit-game-save-path');
   const editCover = document.getElementById('edit-game-cover');
 
   function openEditModal(gameId) {
@@ -391,6 +487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     editCompany.value = game.company || '';
     editGenre.value = game.genre || '';
     editPath.value = game.exePath || '';
+    editSavePath.value = game.customSavePath || '';
     editCover.value = game.coverImage || '';
 
     modalEditGame?.classList.add('active');
@@ -404,6 +501,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnCloseEditModal?.addEventListener('click', closeEditModal);
   btnCancelEditModal?.addEventListener('click', closeEditModal);
 
+  btnBrowseSavePath?.addEventListener('click', async () => {
+    if (window.electronAPI) {
+      const folder = await window.electronAPI.selectSaveFolder();
+      if (folder) editSavePath.value = folder;
+    }
+  });
+
   formEditGame?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const updated = {
@@ -412,14 +516,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       company: editCompany.value.trim(),
       genre: editGenre.value.trim(),
       exePath: editPath.value.trim(),
+      customSavePath: editSavePath.value.trim(),
       coverImage: editCover.value.trim()
     };
 
     if (window.electronAPI) {
       gamesState = await window.electronAPI.saveGame(updated);
-    } else {
-      const idx = gamesState.findIndex(g => g.id === updated.id);
-      if (idx >= 0) gamesState[idx] = { ...gamesState[idx], ...updated };
     }
 
     closeEditModal();
@@ -433,8 +535,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (confirm('Are you sure you want to remove this game from your library?')) {
       if (window.electronAPI) {
         gamesState = await window.electronAPI.deleteGame(idToDelete);
-      } else {
-        gamesState = gamesState.filter(g => g.id !== idToDelete);
       }
       closeEditModal();
       renderAll();
@@ -486,9 +586,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           if (window.electronAPI) {
             gamesState = await window.electronAPI.saveGame(gameToSave);
-          } else {
-            gameToSave.id = `game-${Date.now()}`;
-            gamesState.push(gameToSave);
           }
         }
       }

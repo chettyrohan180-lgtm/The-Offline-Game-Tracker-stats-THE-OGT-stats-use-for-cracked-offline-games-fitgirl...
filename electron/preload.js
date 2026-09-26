@@ -17,16 +17,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSessionTick: (callback) => ipcRenderer.on('tracker:session-tick', (e, data) => callback(data)),
   onSessionStopped: (callback) => ipcRenderer.on('tracker:session-stopped', (e, data) => callback(data)),
 
+  // Achievements & Save Scanner Bridge
+  getAchievements: (gameId) => ipcRenderer.invoke('db:get-achievements', gameId),
+  scanAchievements: (gameId) => ipcRenderer.invoke('achievements:scan', gameId),
+  toggleAchievement: (id, isUnlocked) => ipcRenderer.invoke('db:toggle-achievement', { id, isUnlocked }),
+
   // PE Header & Icon Extractor Bridge
   parseExe: (filePath) => ipcRenderer.invoke('pe:parse-exe', filePath),
 
   // Playtime Sessions Bridge
   getSessions: (gameId) => ipcRenderer.invoke('db:get-sessions', gameId),
   addSession: (sessionData) => ipcRenderer.invoke('db:add-session', sessionData),
-
-  // Achievements Bridge
-  getAchievements: (gameId) => ipcRenderer.invoke('db:get-achievements', gameId),
-  toggleAchievement: (id, isUnlocked) => ipcRenderer.invoke('db:toggle-achievement', { id, isUnlocked }),
 
   // Settings & App Info Bridge
   getSettings: () => ipcRenderer.invoke('db:get-settings'),
@@ -35,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Windows OS / Dialog Bridge
   selectGameExe: () => ipcRenderer.invoke('dialog:select-exe'),
+  selectSaveFolder: () => ipcRenderer.invoke('dialog:select-save-folder'),
   minimizeWindow: () => ipcRenderer.send('window:minimize'),
   maximizeWindow: () => ipcRenderer.send('window:maximize'),
   closeWindow: () => ipcRenderer.send('window:close')

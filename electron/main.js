@@ -4,6 +4,7 @@ const db = require('./db');
 const PeParser = require('./peParser');
 const IconExtractor = require('./iconExtractor');
 const processWatcher = require('./processWatcher');
+const AchievementParser = require('./achievementParser');
 
 let mainWindow = null;
 let tray = null;
@@ -37,7 +38,6 @@ function createWindow() {
     }
   }
 
-  // Initialize process watcher with main window instance
   processWatcher.init(mainWindow);
 
   mainWindow.on('closed', () => {
@@ -92,20 +92,21 @@ function registerIpcHandlers() {
     return { ...parsed, iconPath: icon };
   });
 
+  // Achievements & Save Scanner
+  ipcMain.handle('db:get-achievements', (event, gameId) => db.getAchievements(gameId));
+  ipcMain.handle('achievements:scan', (event, gameId) => AchievementParser.scanGameAchievements(gameId));
+  ipcMain.handle('db:toggle-achievement', (event, { id, isUnlocked }) => db.toggleAchievement(id, isUnlocked));
+
   // DB Sessions
   ipcMain.handle('db:get-sessions', (event, gameId) => db.getSessions(gameId));
   ipcMain.handle('db:add-session', (event, sessionData) => db.addSession(sessionData));
-
-  // DB Achievements
-  ipcMain.handle('db:get-achievements', (event, gameId) => db.getAchievements(gameId));
-  ipcMain.handle('db:toggle-achievement', (event, { id, isUnlocked }) => db.toggleAchievement(id, isUnlocked));
 
   // DB Settings & Info
   ipcMain.handle('db:get-settings', () => db.getSettings());
   ipcMain.handle('db:update-settings', (event, settings) => db.updateSettings(settings));
   ipcMain.handle('app:get-version', () => app.getVersion());
 
-  // Executable Picker Dialog
+  // Executable Picker & Save Folder Dialogs
   ipcMain.handle('dialog:select-exe', async () => {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -127,6 +128,18 @@ function registerIpcHandlers() {
         version: parsed.version,
         coverImage: icon
       };
+    }
+    return null;
+  });
+
+  ipcMain.handle('dialog:select-save-folder', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Save Folder / Config Path',
+      properties: ['openDirectory', 'openFile']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0];
     }
     return null;
   });

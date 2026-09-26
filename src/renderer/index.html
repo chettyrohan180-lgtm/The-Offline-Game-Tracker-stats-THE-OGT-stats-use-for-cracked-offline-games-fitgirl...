@@ -56,6 +56,10 @@
               <svg class="nav-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
               <span>Game Library</span>
             </li>
+            <li class="nav-item" data-view="achievements">
+              <svg class="nav-icon" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"></path></svg>
+              <span>Achievements</span>
+            </li>
             <li class="nav-item" data-view="sessions">
               <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
               <span>Play Sessions</span>
@@ -96,7 +100,7 @@
           </div>
         </div>
 
-        <!-- Live Active Session Banner (Shown when a game is running) -->
+        <!-- Live Active Session Banner -->
         <div id="active-session-banner" class="active-session-banner" style="display: none;">
           <div class="active-banner-content">
             <div class="pulsing-live-badge">
@@ -166,6 +170,46 @@
           </div>
           <div class="games-grid" id="library-games-grid">
             <!-- Rendered Dynamically -->
+          </div>
+        </section>
+
+        <section id="view-achievements" class="view-panel" style="display: none;">
+          <div style="background: var(--bg-card); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-md); padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+            <!-- Game Selector & Control Bar -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <label style="color: var(--text-muted); font-size: 14px; font-weight: 600;">Select Game:</label>
+                <select id="ach-game-select" style="background: var(--bg-glass); border: 1px solid var(--bg-glass-border); color: #fff; padding: 10px 16px; border-radius: var(--border-radius-sm); font-size: 14px; outline: none; min-width: 220px; font-weight: 600;">
+                  <!-- Options added dynamically -->
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <button class="btn-secondary" id="btn-scan-achievements" style="font-size: 13px;">
+                  🔍 Scan Save Files
+                </button>
+              </div>
+            </div>
+
+            <!-- Completion Progress Bar Banner -->
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--bg-glass-border); border-radius: var(--border-radius-md); padding: 18px 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <strong style="color: #fff; font-size: 16px; font-family: var(--font-heading);" id="ach-game-title-banner">Select a game to view achievements</strong>
+                <span style="font-weight: 800; color: var(--accent-emerald); font-size: 18px;" id="ach-percent-text">0%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div id="ach-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                <span id="ach-count-text">0 / 0 Unlocked</span>
+                <span>Offline Stats Engine</span>
+              </div>
+            </div>
+
+            <!-- Achievements Grid -->
+            <div id="achievements-grid" class="achievements-grid">
+              <!-- Rendered Dynamically -->
+            </div>
           </div>
         </section>
 
@@ -269,6 +313,13 @@
         <div class="form-group" style="margin-bottom: 12px;">
           <label>Executable Path</label>
           <input type="text" id="edit-game-path">
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label>Custom Save / Achievements Path</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="edit-game-save-path" placeholder="C:\Users\...\AppData\Goldberg..." style="flex: 1;">
+            <button type="button" class="btn-secondary" id="btn-browse-save-path">Browse...</button>
+          </div>
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
           <label>Cover Image URL / Path</label>
