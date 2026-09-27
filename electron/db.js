@@ -44,100 +44,16 @@ class DatabaseService {
           settings: { ...this.data.settings, ...(parsed.settings || {}) }
         };
       } else {
-        // Create initial default database with seed sample for first launch demo
-        this.seedInitialData();
+        // Fresh install — start with an empty library
         this.save();
       }
     } catch (err) {
-      console.error('[OGT DB] Error loading database, creating backup and reinitializing:', err);
-      this.seedInitialData();
+      console.error('[OGT DB] Error loading database, reinitializing with empty state:', err);
+      // Reset to clean empty state on corruption
       this.save();
     }
   }
 
-  seedInitialData() {
-    const now = new Date().toISOString();
-    this.data.games = [
-      {
-        id: 'game-demo-1',
-        title: 'Cyberpunk 2077',
-        exePath: 'C:\\Games\\Cyberpunk 2077\\bin\\x64\\Cyberpunk2077.exe',
-        productName: 'Cyberpunk 2077',
-        company: 'CD PROJEKT RED',
-        version: '2.12.0.0',
-        iconPath: '',
-        coverImage: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop',
-        genre: 'Action RPG',
-        launchParams: '',
-        totalPlaytimeMinutes: 2840, // ~47.3 hrs
-        lastPlayed: new Date(Date.now() - 3600000 * 5).toISOString(),
-        favorite: true,
-        createdAt: now
-      },
-      {
-        id: 'game-demo-2',
-        title: 'The Witcher 3: Wild Hunt',
-        exePath: 'C:\\Games\\The Witcher 3\\bin\\x64\\witcher3.exe',
-        productName: 'The Witcher 3: Wild Hunt',
-        company: 'CD PROJEKT RED',
-        version: '4.04.0.0',
-        iconPath: '',
-        coverImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1200&auto=format&fit=crop',
-        genre: 'Open World RPG',
-        launchParams: '',
-        totalPlaytimeMinutes: 7420, // ~123.6 hrs
-        lastPlayed: new Date(Date.now() - 3600000 * 48).toISOString(),
-        favorite: true,
-        createdAt: now
-      },
-      {
-        id: 'game-demo-3',
-        title: 'Hades II',
-        exePath: 'C:\\Games\\Hades II\\Hades2.exe',
-        productName: 'Hades II',
-        company: 'Supergiant Games',
-        version: '1.0.0.0',
-        iconPath: '',
-        coverImage: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop',
-        bannerImage: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200&auto=format&fit=crop',
-        genre: 'Rogue-like Action',
-        launchParams: '',
-        totalPlaytimeMinutes: 1350, // ~22.5 hrs
-        lastPlayed: new Date(Date.now() - 3600000 * 12).toISOString(),
-        favorite: false,
-        createdAt: now
-      }
-    ];
-
-    this.data.sessions = [
-      {
-        id: 'sess-1',
-        gameId: 'game-demo-1',
-        startTime: new Date(Date.now() - 3600000 * 8).toISOString(),
-        endTime: new Date(Date.now() - 3600000 * 5).toISOString(),
-        durationSeconds: 10800, // 3 hrs
-        dateFormatted: 'Today'
-      },
-      {
-        id: 'sess-2',
-        gameId: 'game-demo-3',
-        startTime: new Date(Date.now() - 3600000 * 14).toISOString(),
-        endTime: new Date(Date.now() - 3600000 * 12).toISOString(),
-        durationSeconds: 7200, // 2 hrs
-        dateFormatted: 'Yesterday'
-      }
-    ];
-
-    this.data.achievements = [
-      { id: 'ach-1', gameId: 'game-demo-1', key: 'CITY_LEGEND', title: 'The City Legend', description: 'Reach maximum Street Cred in Night City.', isUnlocked: true, unlockedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
-      { id: 'ach-2', gameId: 'game-demo-1', key: 'FULL_CHROME', title: 'Full Cyberware', description: 'Install at least one implant in each body slot.', isUnlocked: true, unlockedAt: new Date(Date.now() - 86400000 * 5).toISOString() },
-      { id: 'ach-3', gameId: 'game-demo-1', key: 'GUN_SLINGER', title: 'Gunslinger', description: 'Shoot down an incoming grenade with a revolver.', isUnlocked: false, unlockedAt: null },
-      { id: 'ach-4', gameId: 'game-demo-2', key: 'KINGS_LAYER', title: 'Kingmaker', description: 'Complete the Skellige succession subplot.', isUnlocked: true, unlockedAt: new Date(Date.now() - 86400000 * 10).toISOString() },
-      { id: 'ach-5', gameId: 'game-demo-2', key: 'MUTANT', title: 'Mutant', description: 'Fill all mutagen slots in the skills matrix.', isUnlocked: true, unlockedAt: new Date(Date.now() - 86400000 * 15).toISOString() }
-    ];
-  }
 
   save() {
     try {

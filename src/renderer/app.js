@@ -63,12 +63,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     return [hrs, mins, secs].map(v => v.toString().padStart(2, '0')).join(':');
   }
 
+  function generateSVGBadge(title) {
+    const cleanTitle = (title || 'OGT').trim();
+    const initials = cleanTitle.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '🎮';
+    const gradients = [
+      ['#6366f1', '#8b5cf6'],
+      ['#00f2fe', '#4facfe'],
+      ['#10b981', '#059669'],
+      ['#f59e0b', '#d97706'],
+      ['#ec4899', '#8b5cf6']
+    ];
+    const charSum = cleanTitle.split('').reduce((sum, c) => sum + c.charCodeAt(0), 0);
+    const [c1, c2] = gradients[charSum % gradients.length];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${c1}" /><stop offset="100%" stop-color="${c2}" /></linearGradient></defs><rect width="256" height="256" rx="40" fill="url(#g)" /><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-family="-apple-system,sans-serif" font-weight="800" font-size="96">${initials}</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
+
   function updateActiveSessionUI(sessionData) {
     if (!sessionData) return;
     
     if (activeSessionBanner) activeSessionBanner.style.display = 'block';
     if (activeGameTitle) activeGameTitle.textContent = sessionData.title || 'Offline Game';
-    if (activeGameCover) activeGameCover.src = sessionData.coverImage || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
+    if (activeGameCover) activeGameCover.src = sessionData.coverImage || generateSVGBadge(sessionData.title);
     if (activeGameTimer) activeGameTimer.textContent = formatHHMMSS(sessionData.durationSeconds || 0);
 
     if (btnStopActiveSession) {
@@ -196,7 +212,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function createGameCardHTML(game) {
     const hours = ((game.totalPlaytimeMinutes || 0) / 60).toFixed(1);
-    const cover = game.coverImage || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';
+    // Use extracted .exe icon, then SVG badge fallback — never an external URL
+    const cover = (game.coverImage && !game.coverImage.startsWith('http'))
+      ? game.coverImage
+      : generateSVGBadge(game.title);
     const favClass = game.favorite ? 'active' : '';
     const completion = game.completionPercentage || 0;
     
@@ -211,7 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button class="card-action-btn favorite ${favClass}" data-id="${game.id}" title="Toggle Favorite">⭐</button>
           <button class="card-action-btn edit" data-id="${game.id}" title="Edit Game">⚙️</button>
         </div>
-        <img class="game-cover" src="${cover}" alt="${game.title}" loading="lazy">
+        <img class="game-cover" src="${cover}" alt="${game.title}" loading="lazy" onerror="this.src='${generateSVGBadge(game.title)}'">
         <div class="game-details">
           <div class="game-title" title="${game.title}">${game.title}</div>
           <div class="game-meta">
@@ -227,12 +246,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
+  const EMPTY_LIBRARY_HTML = `
+    <div style="grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px;">
+      <div style="font-size: 64px; filter: grayscale(0.3);">🎮</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.3px;">Your Library is Empty</div>
+      <div style="font-size: 14px; color: var(--text-muted); text-align: center; max-width: 380px; line-height: 1.6;">
+        Click <strong style="color:var(--accent-violet)">+ Add Game</strong> or drag &amp; drop any <code style="background:rgba(255,255,255,0.07);padding:2px 6px;border-radius:4px;">.exe</code> file here to get started.
+        OGT will auto-read the game name, version, and icon from the file.
+      </div>
+    </div>
+  `;
+
   function renderDashboardGrid() {
     const grid = document.getElementById('dashboard-games-grid');
     if (!grid) return;
 
     if (gamesState.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 40px;">No games added yet. Drag & drop a .EXE file or click "+ Add Executable"!</div>`;
+      grid.innerHTML = EMPTY_LIBRARY_HTML;
       return;
     }
 
@@ -251,7 +281,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (displayGames.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 40px;">No games match the current filter.</div>`;
+      const msg = libraryFilter === 'favorites'
+        ? `<div style="grid-column:1/-1;color:var(--text-muted);text-align:center;padding:40px;">No favourites yet — star a game to pin it here.</div>`
+        : EMPTY_LIBRARY_HTML;
+      grid.innerHTML = msg;
       return;
     }
 
@@ -360,8 +393,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const game = gamesState.find(g => g.id === gameId);
     if (!game) return;
 
-    const banner = game.bannerImage || game.coverImage || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop';
-    if (heroBackdrop) heroBackdrop.style.backgroundImage = `url('${banner}')`;
+    const coverForBanner = (game.bannerImage && !game.bannerImage.startsWith('http'))
+      ? game.bannerImage
+      : (game.coverImage && !game.coverImage.startsWith('http'))
+        ? game.coverImage
+        : null;
+    if (heroBackdrop) {
+      if (coverForBanner) {
+        heroBackdrop.style.backgroundImage = `url('${coverForBanner}')`;
+      } else {
+        // No local image — use a gradient based on game title
+        heroBackdrop.style.backgroundImage = generateSVGBadge(game.title)
+          ? `url("${generateSVGBadge(game.title)}")`
+          : 'none';
+      }
+    }
     if (heroTitle) heroTitle.textContent = game.title;
     if (heroMeta) heroMeta.textContent = `${game.company || 'Unknown Publisher'} • ${game.genre || 'Offline Game'}`;
     
