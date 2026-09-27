@@ -60,14 +60,23 @@ class ProcessWatcher {
         const activeSess = this.activeSessions.get(game.id);
 
         if (matchingProc && !activeSess) {
-          // Process started
+          // Process started externally
           this.onGameStarted(game, matchingProc.pid, false);
         } else if (matchingProc && activeSess && !activeSess.isSimulated) {
           // Process heartbeat tick
+          activeSess.hasEverMatched = true;
+          if (activeSess.pid === 'PENDING' || !activeSess.pid) {
+            activeSess.pid = matchingProc.pid;
+          }
           this.onGameTick(activeSess);
         } else if (!matchingProc && activeSess && !activeSess.isSimulated) {
-          // Process stopped
-          this.onGameStopped(game.id);
+          // Give newly launched games a 15-second grace period to appear in tasklist
+          const startupGraceMs = 15000;
+          const isStartingUp = !activeSess.hasEverMatched && (Date.now() - activeSess.startTimestamp) < startupGraceMs;
+          if (!isStartingUp) {
+            // Process genuinely stopped
+            this.onGameStopped(game.id);
+          }
         }
       });
 
@@ -98,9 +107,10 @@ class ProcessWatcher {
       coverImage: game.coverImage,
       startTime: now,
       startTimestamp: Date.now(),
-      pid: pid || 'SIMULATED',
+      pid: pid || 'PENDING',
       durationSeconds: 0,
-      isSimulated
+      isSimulated,
+      hasEverMatched: !!pid && pid !== 'PENDING' && pid !== 'SIMULATED'
     };
 
     this.activeSessions.set(game.id, sessionData);
@@ -149,9 +159,9 @@ class ProcessWatcher {
   }
 
   /**
-   * Launch a game binary and attach process watcher
+   * Launch a game binary safely with Windows elevation (UAC) support and attach process watcher
    */
-  launchGame(gameId) {
+  async launchGame(gameId) {
     const game = db.getGameById(gameId);
     if (!game) throw new Error('Game not found');
 
@@ -160,18 +170,106 @@ class ProcessWatcher {
     }
 
     if (game.exePath && require('fs').existsSync(game.exePath)) {
-      try {
-        const child = require('child_process').spawn(game.exePath, game.launchParams ? game.launchParams.split(' ') : [], {
-          detached: true,
-          cwd: path.dirname(game.exePath),
-          stdio: 'ignore'
-        });
-        child.unref();
+      const gameDir = path.dirname(game.exePath);
+      let launched = false;
 
-        this.onGameStarted(game, child.pid, false);
-        return { status: 'launched', pid: child.pid };
-      } catch (err) {
-        console.warn(`[OGT Launcher] Failed to spawn ${game.exePath}:`, err.message);
+      // Strategy 1: If launch parameters exist, use Windows 'start' via ShellExecute to support UAC & params
+      if (game.launchParams && game.launchParams.trim()) {
+        try {
+          const cmd = `cmd.exe /c start "" /D "${gameDir}" "${game.exePath}" ${game.launchParams.trim()}`;
+          await new Promise((resolve, reject) => {
+            exec(cmd, { cwd: gameDir, windowsHide: true }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          launched = true;
+        } catch (err) {
+          console.warn('[OGT Launcher] Failed to launch with cmd start params:', err.message);
+        }
+      }
+
+      // Strategy 2: Native Electron shell.openPath
+      // shell.openPath invokes Windows ShellExecuteEx natively, which triggers the UAC prompt
+      // if administrator elevation is required, avoiding EACCES errors.
+      if (!launched) {
+        try {
+          let electronShell = null;
+          try { electronShell = require('electron').shell; } catch (e) {}
+          if (electronShell && typeof electronShell.openPath === 'function') {
+            const errMsg = await electronShell.openPath(game.exePath);
+            if (!errMsg) {
+              launched = true;
+            } else {
+              console.warn('[OGT Launcher] shell.openPath returned:', errMsg);
+            }
+          }
+        } catch (err) {
+          console.warn('[OGT Launcher] shell.openPath failed:', err.message);
+        }
+      }
+
+      // Strategy 3: Standard Windows 'start' command
+      if (!launched) {
+        try {
+          const cmd = `cmd.exe /c start "" /D "${gameDir}" "${game.exePath}"`;
+          await new Promise((resolve, reject) => {
+            exec(cmd, { cwd: gameDir, windowsHide: true }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          launched = true;
+        } catch (err) {
+          console.warn('[OGT Launcher] cmd start fallback failed:', err.message);
+        }
+      }
+
+      // Strategy 4: PowerShell Start-Process fallback
+      if (!launched) {
+        try {
+          const escapedPath = game.exePath.replace(/'/g, "''");
+          const escapedDir = gameDir.replace(/'/g, "''");
+          const psCmd = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '${escapedPath}' -WorkingDirectory '${escapedDir}'"`;
+          await new Promise((resolve, reject) => {
+            exec(psCmd, { windowsHide: true }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          launched = true;
+        } catch (err) {
+          console.warn('[OGT Launcher] PowerShell Start-Process fallback failed:', err.message);
+        }
+      }
+
+      // Strategy 5: child_process.spawn with explicit error handling (so EACCES never becomes an uncaught exception)
+      if (!launched) {
+        try {
+          await new Promise((resolve, reject) => {
+            const child = require('child_process').spawn(game.exePath, game.launchParams ? game.launchParams.split(' ') : [], {
+              detached: true,
+              cwd: gameDir,
+              stdio: 'ignore'
+            });
+            child.on('error', (spawnErr) => {
+              console.warn('[OGT Launcher] spawn error safely handled:', spawnErr.message);
+              reject(spawnErr);
+            });
+            child.unref();
+            resolve(child.pid);
+          });
+          launched = true;
+        } catch (err) {
+          console.warn('[OGT Launcher] child_process.spawn failed:', err.message);
+        }
+      }
+
+      if (launched) {
+        this.onGameStarted(game, 'PENDING', false);
+        // Force an immediate process check in 2 seconds to attach the real Windows PID
+        setTimeout(() => this.checkProcesses(), 2000);
+        return { status: 'launched' };
       }
     }
 

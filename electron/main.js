@@ -6,6 +6,14 @@ const IconExtractor = require('./iconExtractor');
 const processWatcher = require('./processWatcher');
 const AchievementParser = require('./achievementParser');
 
+// Catch any unhandled errors in the main process to prevent pop-up error dialogs
+process.on('uncaughtException', (err) => {
+  console.error('[OGT Main Process Uncaught Exception]:', err.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[OGT Main Process Unhandled Rejection]:', reason);
+});
+
 let mainWindow = null;
 let tray = null;
 
