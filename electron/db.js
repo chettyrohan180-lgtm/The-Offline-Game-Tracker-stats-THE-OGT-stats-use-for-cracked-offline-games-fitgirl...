@@ -37,12 +37,24 @@ class DatabaseService {
       if (fs.existsSync(this.dbFilePath)) {
         const rawContent = fs.readFileSync(this.dbFilePath, 'utf8');
         const parsed = JSON.parse(rawContent);
+
+        // Filter out any leftover demo mock data from earlier builds
+        const isDemo = id => typeof id === 'string' && (id.startsWith('game-demo-') || id.startsWith('sess-') || id.startsWith('ach-'));
+        const cleanGames = (parsed.games || []).filter(g => !isDemo(g.id));
+        const cleanSessions = (parsed.sessions || []).filter(s => !isDemo(s.id) && !isDemo(s.gameId));
+        const cleanAchievements = (parsed.achievements || []).filter(a => !isDemo(a.id) && !isDemo(a.gameId));
+
         this.data = {
-          games: parsed.games || [],
-          sessions: parsed.sessions || [],
-          achievements: parsed.achievements || [],
+          games: cleanGames,
+          sessions: cleanSessions,
+          achievements: cleanAchievements,
           settings: { ...this.data.settings, ...(parsed.settings || {}) }
         };
+
+        // If demo items were present, clean up the file on disk
+        if (cleanGames.length !== (parsed.games || []).length) {
+          this.save();
+        }
       } else {
         // Fresh install — start with an empty library
         this.save();
